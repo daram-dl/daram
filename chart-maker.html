@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>릴스 시청유지 그래프 메이커</title>
+<style>
+  :root{ --acc:#CC00CC; --muted:#737373; --grid:#E8E8E8; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    background:#f0f0f0; color:#111; padding:20px; line-height:1.5;
+  }
+  .wrap{ max-width:1000px; margin:0 auto; }
+  h1{ font-size:20px; margin-bottom:4px; }
+  .desc{ font-size:13px; color:var(--muted); margin-bottom:18px; }
+
+  .panel{ background:#fff; border-radius:14px; padding:18px; margin-bottom:16px;
+           box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .panel h2{ font-size:14px; margin-bottom:12px; }
+
+  /* 미리보기 영역 — 체커보드(투명 표현) */
+  .stage{
+    background-image:
+      linear-gradient(45deg,#ddd 25%,transparent 25%),
+      linear-gradient(-45deg,#ddd 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#ddd 75%),
+      linear-gradient(-45deg,transparent 75%,#ddd 75%);
+    background-size:16px 16px;
+    background-position:0 0,0 8px,8px -8px,-8px 0;
+    display:inline-block; border-radius:8px; overflow:hidden;
+    max-width:100%;
+  }
+  canvas{ display:block; touch-action:none; cursor:crosshair; max-width:100%; height:auto; }
+
+  .controls{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; }
+  .ctl label{ display:block; font-size:12px; color:var(--muted); margin-bottom:5px; }
+  .ctl input[type=number],.ctl input[type=text]{
+    width:100%; padding:7px 9px; border:1px solid #ccc; border-radius:8px; font-size:13px;
+  }
+  .ctl input[type=range]{ width:100%; }
+  .row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .chk{ display:flex; align-items:center; gap:6px; font-size:13px; }
+
+  .btns{ display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
+  button{
+    font-family:inherit; font-size:13px; font-weight:600; padding:9px 16px;
+    border:none; border-radius:9px; cursor:pointer;
+  }
+  .btn-primary{ background:var(--acc); color:#fff; }
+  .btn-ghost{ background:#eee; color:#222; }
+  .hint{ font-size:12px; color:var(--muted); margin-top:10px; }
+  .pts-list{ display:flex; flex-direction:column; gap:8px; margin-top:6px; max-height:260px; overflow:auto; }
+  .pt-row{ display:flex; align-items:center; gap:8px; font-size:12px; }
+  .pt-row span{ width:54px; color:var(--muted); }
+  .pt-row input[type=range]{ flex:1; }
+  .pt-row b{ width:42px; text-align:right; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>릴스 시청 유지율 그래프 메이커</h1>
+  <p class="desc">점을 드래그하거나 슬라이더로 곡선을 만든 뒤, 인스타 스크린샷 위에 그대로 합성할 수 있게 투명 PNG로 내보냅니다.</p>
+
+  <!-- 미리보기 -->
+  <div class="panel">
+    <h2>미리보기 <span style="font-weight:400;color:var(--muted);font-size:12px;">(점을 위아래로 드래그)</span></h2>
+    <div class="stage"><canvas id="cv"></canvas></div>
+    <p class="hint" id="sizeHint"></p>
+  </div>
+
+  <!-- 점 슬라이더 -->
+  <div class="panel">
+    <h2>유지율 값 (각 시점 %)</h2>
+    <div class="row" style="margin-bottom:8px">
+      <div class="ctl" style="width:160px">
+        <label>점 개수</label>
+        <input type="number" id="ptCount" min="2" max="40" value="9"/>
+      </div>
+      <button class="btn-ghost" id="presetBtn" type="button">기본형(급락→평탄) 적용</button>
+    </div>
+    <div class="pts-list" id="ptsList"></div>
+  </div>
+
+  <!-- 스타일/크기 -->
+  <div class="panel">
+    <h2>스타일 &amp; 출력 크기</h2>
+    <div class="controls">
+      <div class="ctl">
+        <label>출력 가로(px)</label>
+        <input type="number" id="outW" value="928"/>
+      </div>
+      <div class="ctl">
+        <label>출력 세로(px)</label>
+        <input type="number" id="outH" value="240"/>
+      </div>
+      <div class="ctl">
+        <label>선 색상</label>
+        <input type="text" id="lineColor" value="#CC00CC"/>
+      </div>
+      <div class="ctl">
+        <label>선 두께(px)</label>
+        <input type="number" id="lineW" value="6" min="1" step="0.5"/>
+      </div>
+      <div class="ctl">
+        <label>곡선 부드러움</label>
+        <input type="range" id="smooth" min="0" max="100" value="55"/>
+      </div>
+      <div class="ctl">
+        <label>좌측 여백(축라벨)</label>
+        <input type="number" id="padL" value="78"/>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <label class="chk"><input type="checkbox" id="showGrid" checked/> 그리드선</label>
+      <label class="chk"><input type="checkbox" id="showYlbl" checked/> Y축 라벨(100/50/0)</label>
+      <label class="chk"><input type="checkbox" id="showXlbl" checked/> X축 라벨(시간)</label>
+      <label class="chk"><input type="checkbox" id="whiteBg"/> 흰색 배경(미합성용)</label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="ctl" style="width:140px">
+        <label>시작 시간</label>
+        <input type="text" id="xStart" value="0:00"/>
+      </div>
+      <div class="ctl" style="width:140px">
+        <label>종료 시간</label>
+        <input type="text" id="xEnd" value="0:25"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="btns">
+      <button class="btn-primary" id="dlBtn" type="button">PNG 내보내기</button>
+      <button class="btn-ghost" id="copyBtn" type="button">클립보드로 복사</button>
+    </div>
+    <p class="hint">💡 합성 팁: 스크린샷의 그래프 영역(100% 선부터 0:00 라벨까지)을 지우고, 내보낸 투명 PNG를 같은 위치에 올리면 됩니다. 가로/세로 px를 스크린샷 그래프 영역 크기와 맞추세요.</p>
+  </div>
+</div>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+// 상태: 각 점의 y값(0~100%). x는 균등 분포.
+let values = [];
+function defaultValues(n){
+  // 인스타 리텐션 형태: 100 → 급락 → 5% 평탄 꼬리
+  const preset = [100, 66, 13, 9, 7, 6, 5, 5, 4];
+  const out = [];
+  for(let i=0;i<n;i++){
+    const t = i/(n-1);
+    // preset 보간
+    const fi = t*(preset.length-1);
+    const a = Math.floor(fi), b = Math.min(a+1, preset.length-1);
+    out.push(Math.round(preset[a] + (preset[b]-preset[a])*(fi-a)));
+  }
+  return out;
+}
+
+const el = id => document.getElementById(id);
+
+function rebuildPts(keep){
+  const n = Math.max(2, Math.min(40, parseInt(el('ptCount').value)||9));
+  if(!keep || values.length!==n){
+    const old = values;
+    if(keep && old.length){
+      const nv=[];
+      for(let i=0;i<n;i++){
+        const t=i/(n-1)*(old.length-1);
+        const a=Math.floor(t), b=Math.min(a+1,old.length-1);
+        nv.push(old[a]+(old[b]-old[a])*(t-a));
+      }
+      values=nv;
+    } else {
+      values = defaultValues(n);
+    }
+  }
+  renderSliders();
+  draw();
+}
+
+function renderSliders(){
+  const list = el('ptsList');
+  list.innerHTML='';
+  values.forEach((v,i)=>{
+    const t = i/(values.length-1);
+    const label = i===0?'시작':(i===values.length-1?'끝':(Math.round(t*100)+'%지점'));
+    const row=document.createElement('div');
+    row.className='pt-row';
+    row.innerHTML=`<span>${label}</span>
+      <input type="range" min="0" max="100" step="1" value="${Math.round(v)}" data-i="${i}"/>
+      <b>${Math.round(v)}%</b>`;
+    const rng=row.querySelector('input');
+    rng.addEventListener('input',e=>{
+      values[i]=parseFloat(e.target.value);
+      row.querySelector('b').textContent=Math.round(values[i])+'%';
+      draw();
+    });
+    list.appendChild(row);
+  });
+}
+
+// ── 그리기 ──
+function geom(){
+  const W = parseInt(el('outW').value)||928;
+  const H = parseInt(el('outH').value)||240;
+  const padL = parseInt(el('padL').value)||78;
+  const padR = 20;
+  const padT = 24;          // 100% 선 위 여백
+  const padB = 42;          // X 라벨 공간
+  return {W,H,padL,padR,padT,padB,
+    plotL:padL, plotR:W-padR, plotT:padT, plotB:H-padB};
+}
+
+function valToXY(i,g){
+  const x = g.plotL + (g.plotR-g.plotL)*(i/(values.length-1));
+  const y = g.plotB - (g.plotB-g.plotT)*(values[i]/100);
+  return {x,y};
+}
+
+function draw(){
+  const g = geom();
+  const dpr = window.devicePixelRatio||1;
+  cv.width = g.W*dpr; cv.height = g.H*dpr;
+  cv.style.width = g.W+'px'; cv.style.height = g.H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,g.W,g.H);
+
+  if(el('whiteBg').checked){ ctx.fillStyle='#fff'; ctx.fillRect(0,0,g.W,g.H); }
+
+  const yFont = '24px -apple-system,BlinkMacSystemFont,sans-serif';
+
+  // 그리드 (100 / 50 / 0)
+  if(el('showGrid').checked){
+    ctx.strokeStyle='#E8E8E8'; ctx.lineWidth=1.5;
+    [100,50,0].forEach(p=>{
+      const y = g.plotB - (g.plotB-g.plotT)*(p/100);
+      ctx.beginPath(); ctx.moveTo(g.plotL,y+.5); ctx.lineTo(g.plotR,y+.5); ctx.stroke();
+    });
+  }
+  // Y 라벨
+  if(el('showYlbl').checked){
+    ctx.fillStyle='#737373'; ctx.font=yFont; ctx.textAlign='right'; ctx.textBaseline='middle';
+    [['100%',100],['50%',50],['0',0]].forEach(([t,p])=>{
+      const y = g.plotB - (g.plotB-g.plotT)*(p/100);
+      ctx.fillText(t, g.plotL-12, y);
+    });
+  }
+  // X 라벨
+  if(el('showXlbl').checked){
+    ctx.fillStyle='#737373'; ctx.font=yFont; ctx.textBaseline='top';
+    ctx.textAlign='left';  ctx.fillText(el('xStart').value, g.plotL, g.plotB+12);
+    ctx.textAlign='right'; ctx.fillText(el('xEnd').value, g.plotR, g.plotB+12);
+  }
+
+  // 곡선
+  const pts = values.map((_,i)=>valToXY(i,g));
+  const smooth = (parseInt(el('smooth').value)||0)/100;
+  ctx.strokeStyle = el('lineColor').value || '#CC00CC';
+  ctx.lineWidth = parseFloat(el('lineW').value)||6;
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  if(smooth<=0){
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+  } else {
+    // Catmull-Rom → 베지어, smooth로 텐션 조절
+    for(let i=0;i<pts.length-1;i++){
+      const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||p2;
+      const t=smooth/6;
+      const c1x=p1.x+(p2.x-p0.x)*t, c1y=p1.y+(p2.y-p0.y)*t;
+      const c2x=p2.x-(p3.x-p1.x)*t, c2y=p2.y-(p3.y-p1.y)*t;
+      ctx.bezierCurveTo(c1x,c1y,c2x,c2y,p2.x,p2.y);
+    }
+  }
+  ctx.stroke();
+
+  // 드래그용 핸들(내보낼 땐 숨김)
+  if(!exporting){
+    pts.forEach(p=>{
+      ctx.beginPath(); ctx.arc(p.x,p.y,5,0,7);
+      ctx.fillStyle='#fff'; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle=el('lineColor').value; ctx.stroke();
+    });
+  }
+
+  el('sizeHint').textContent = `출력 크기: ${g.W} × ${g.H} px  ·  점 ${values.length}개`;
+}
+
+// ── 드래그 ──
+let dragIdx=-1, exporting=false;
+function canvasPos(e){
+  const r=cv.getBoundingClientRect();
+  const sx=cv.width/window.devicePixelRatio/r.width;
+  const sy=cv.height/window.devicePixelRatio/r.height;
+  const cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+  const cy=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+  return {x:cx*sx, y:cy*sy};
+}
+function pickPoint(pos){
+  const g=geom();
+  let best=-1,bd=400;
+  values.forEach((_,i)=>{
+    const p=valToXY(i,g);
+    const d=(p.x-pos.x)**2+(p.y-pos.y)**2;
+    if(d<bd){bd=d;best=i;}
+  });
+  return best;
+}
+function setFromY(i,y){
+  const g=geom();
+  let v=(g.plotB-y)/(g.plotB-g.plotT)*100;
+  v=Math.max(0,Math.min(100,v));
+  values[i]=v;
+  const rng=document.querySelector(`#ptsList input[data-i="${i}"]`);
+  if(rng){ rng.value=Math.round(v); rng.nextElementSibling.textContent=Math.round(v)+'%'; }
+}
+function down(e){ dragIdx=pickPoint(canvasPos(e)); if(dragIdx>=0){e.preventDefault();} }
+function move(e){ if(dragIdx<0)return; e.preventDefault(); setFromY(dragIdx,canvasPos(e).y); draw(); }
+function up(){ dragIdx=-1; }
+cv.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+cv.addEventListener('touchstart',down,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',up);
+
+// ── 내보내기 ──
+function exportCanvas(){
+  // 핸들 없이 다시 그려서 깨끗한 캔버스 생성
+  exporting=true; draw();
+  const data = cv.toDataURL('image/png');
+  exporting=false; draw();
+  return data;
+}
+el('dlBtn').onclick=()=>{
+  const a=document.createElement('a');
+  a.href=exportCanvas(); a.download='retention-graph.png'; a.click();
+};
+el('copyBtn').onclick=async()=>{
+  try{
+    exporting=true; draw();
+    cv.toBlob(async b=>{
+      try{ await navigator.clipboard.write([new ClipboardItem({'image/png':b})]);
+        alert('클립보드에 복사됐어요!'); }
+      catch(err){ alert('이 브라우저는 클립보드 복사를 지원하지 않습니다. PNG 내보내기를 사용하세요.'); }
+      exporting=false; draw();
+    });
+  }catch(e){ exporting=false; draw(); }
+};
+
+// ── 이벤트 바인딩 ──
+el('ptCount').addEventListener('input',()=>rebuildPts(true));
+el('presetBtn').addEventListener('click',()=>{ values=defaultValues(values.length); renderSliders(); draw(); });
+['outW','outH','lineColor','lineW','smooth','padL','xStart','xEnd'].forEach(id=>el(id).addEventListener('input',draw));
+['showGrid','showYlbl','showXlbl','whiteBg'].forEach(id=>el(id).addEventListener('change',draw));
+
+rebuildPts(false);
+</script>
+</body>
+</html>
