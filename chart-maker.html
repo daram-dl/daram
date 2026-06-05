@@ -121,6 +121,11 @@
       <label class="chk"><input type="checkbox" id="showXlbl" checked/> X축 라벨(시간)</label>
       <label class="chk"><input type="checkbox" id="whiteBg"/> 흰색 배경(미합성용)</label>
       <label class="chk"><input type="checkbox" id="plotBg"/> 선 영역만 흰배경(라벨 제외)</label>
+      <div class="chk" style="gap:5px">
+        <span style="font-size:12px;color:var(--muted)">확장</span>
+        <input type="number" id="plotBgEx" value="10" min="0" max="200" style="width:60px;padding:4px 6px;border:1px solid #ccc;border-radius:6px;font-size:12px;"/>
+        <span style="font-size:12px;color:var(--muted)">px</span>
+      </div>
     </div>
     <div class="row" style="margin-top:12px">
       <div class="ctl" style="width:140px">
@@ -235,8 +240,9 @@ function draw(){
   if(el('whiteBg').checked){ ctx.fillStyle='#fff'; ctx.fillRect(0,0,g.W,g.H); }
   // 선 영역(플롯 박스)만 흰배경 — 축 라벨 영역은 투명 유지
   if(el('plotBg').checked){
+    const ex = parseInt(el('plotBgEx').value)||0;
     ctx.fillStyle='#fff';
-    ctx.fillRect(g.plotL, g.plotT, g.plotR-g.plotL, g.plotB-g.plotT);
+    ctx.fillRect(g.plotL - ex, g.plotT - ex, (g.plotR-g.plotL) + ex*2, (g.plotB-g.plotT) + ex*2);
   }
 
   const yFont = '18px -apple-system,BlinkMacSystemFont,sans-serif';
@@ -359,7 +365,7 @@ el('copyBtn').onclick=async()=>{
 // ── 이벤트 바인딩 ──
 el('ptCount').addEventListener('input',()=>rebuildPts(true));
 el('presetBtn').addEventListener('click',()=>{ values=defaultValues(values.length); renderSliders(); draw(); });
-['outW','outH','lineColor','lineW','smooth','padL','padR','xStart','xEnd'].forEach(id=>el(id).addEventListener('input',draw));
+['outW','outH','lineColor','lineW','smooth','padL','padR','xStart','xEnd','plotBgEx'].forEach(id=>el(id).addEventListener('input',draw));
 ['showGrid','showYlbl','showXlbl','whiteBg','plotBg'].forEach(id=>el(id).addEventListener('change',draw));
 
 rebuildPts(false);
