@@ -110,6 +110,10 @@
         <label>좌측 여백(축라벨)</label>
         <input type="number" id="padL" value="78"/>
       </div>
+      <div class="ctl">
+        <label>우측 여백(px)</label>
+        <input type="number" id="padR" value="20"/>
+      </div>
     </div>
     <div class="row" style="margin-top:14px">
       <label class="chk"><input type="checkbox" id="showGrid" checked/> 그리드선</label>
@@ -206,7 +210,7 @@ function geom(){
   const W = parseInt(el('outW').value)||928;
   const H = parseInt(el('outH').value)||240;
   const padL = parseInt(el('padL').value)||78;
-  const padR = 20;
+  const padR = parseInt(el('padR').value)||20;
   const padT = 24;          // 100% 선 위 여백
   const padB = 42;          // X 라벨 공간
   return {W,H,padL,padR,padT,padB,
@@ -349,7 +353,7 @@ el('copyBtn').onclick=async()=>{
 // ── 이벤트 바인딩 ──
 el('ptCount').addEventListener('input',()=>rebuildPts(true));
 el('presetBtn').addEventListener('click',()=>{ values=defaultValues(values.length); renderSliders(); draw(); });
-['outW','outH','lineColor','lineW','smooth','padL','xStart','xEnd'].forEach(id=>el(id).addEventListener('input',draw));
+['outW','outH','lineColor','lineW','smooth','padL','padR','xStart','xEnd'].forEach(id=>el(id).addEventListener('input',draw));
 ['showGrid','showYlbl','showXlbl','whiteBg'].forEach(id=>el(id).addEventListener('change',draw));
 
 rebuildPts(false);
