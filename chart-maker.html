@@ -100,11 +100,11 @@
       </div>
       <div class="ctl">
         <label>선 두께(px)</label>
-        <input type="number" id="lineW" value="6" min="1" step="0.5"/>
+        <input type="number" id="lineW" value="7" min="1" step="0.5"/>
       </div>
       <div class="ctl">
         <label>곡선 부드러움</label>
-        <input type="range" id="smooth" min="0" max="100" value="55"/>
+        <input type="range" id="smooth" min="0" max="100" value="40"/>
       </div>
       <div class="ctl">
         <label>좌측 여백(축라벨)</label>
@@ -229,7 +229,7 @@ function draw(){
 
   if(el('whiteBg').checked){ ctx.fillStyle='#fff'; ctx.fillRect(0,0,g.W,g.H); }
 
-  const yFont = '24px -apple-system,BlinkMacSystemFont,sans-serif';
+  const yFont = '18px -apple-system,BlinkMacSystemFont,sans-serif';
 
   // 그리드 (100 / 50 / 0)
   if(el('showGrid').checked){
