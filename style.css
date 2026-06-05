@@ -129,14 +129,14 @@ body {
 }
 
 .eng-icon {
-  color: var(--color-text);
+  color: #000000;
   display: block;
 }
 
 .engagement-count {
   font-size: 12px;
   font-weight: 700;
-  color: var(--color-text);
+  color: #000000;
 }
 
 /* ── 탭바 ── */
